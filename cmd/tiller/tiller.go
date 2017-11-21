@@ -41,7 +41,7 @@ import (
 	"k8s.io/helm/pkg/tiller/environment"
 	"k8s.io/helm/pkg/tlsutil"
 	"k8s.io/helm/pkg/version"
-	"k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"k8s.io/client-go/tools/clientcmd"
 	"github.com/spf13/pflag"
 )
 
@@ -79,7 +79,7 @@ var (
 	certFile             = flag.String("tls-cert", tlsDefaultsFromEnv("tls-cert"), "path to TLS certificate file")
 	caCertFile           = flag.String("tls-ca-cert", tlsDefaultsFromEnv("tls-ca-cert"), "trust certificates signed by this CA")
 	maxHistory           = flag.Int("history-max", historyMaxFromEnv(), "maximum number of releases kept in release history, with 0 meaning no limit")
-	kubeconfigFile       = flag.String("kubeconfig-file", "", "absolute path to the kubeconfig file")
+	kubeconfigFile       = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
 	// rootServer is the root gRPC server.
 	//
 	// Each gRPC service registers itself to this server during init().
@@ -111,8 +111,21 @@ func start() {
 	}
 
 	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
-	flags.Set("kubeconfig", *kubeconfigFile)
-	config := util.DefaultClientConfig(flags)
+	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
+	// use the standard defaults for this client command
+	// DEPRECATED: remove and replace with something more accurate
+	loadingRules.DefaultClientConfig = &clientcmd.DefaultClientConfig
+
+	loadingRules.ExplicitPath = *kubeconfigFile
+	logger.Printf("ExplicitPath: %s", loadingRules.ExplicitPath)
+	overrides := &clientcmd.ConfigOverrides{ClusterDefaults: clientcmd.ClusterDefaults}
+
+	flagNames := clientcmd.RecommendedConfigOverrideFlags("")
+	// short flagnames are disabled by default.  These are here for compatibility with existing scripts
+	flagNames.ClusterOverrideFlags.APIServer.ShortName = "s"
+
+	clientcmd.BindOverrideFlags(overrides, flags, flagNames)
+	config := clientcmd.NewInteractiveDeferredLoadingClientConfig(loadingRules, overrides, os.Stdin)
 	clientset, err := kube.New(config).ClientSet()
 	if err != nil {
 		logger.Fatalf("Cannot initialize Kubernetes connection: %s", err)
