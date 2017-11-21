@@ -41,7 +41,8 @@ import (
 	"k8s.io/helm/pkg/tiller/environment"
 	"k8s.io/helm/pkg/tlsutil"
 	"k8s.io/helm/pkg/version"
-	"k8s.io/client-go/tools/clientcmd"
+	"k8s.io/kubernetes/pkg/kubectl/cmd/util"
+	"github.com/spf13/pflag"
 )
 
 const (
@@ -78,7 +79,7 @@ var (
 	certFile             = flag.String("tls-cert", tlsDefaultsFromEnv("tls-cert"), "path to TLS certificate file")
 	caCertFile           = flag.String("tls-ca-cert", tlsDefaultsFromEnv("tls-ca-cert"), "trust certificates signed by this CA")
 	maxHistory           = flag.Int("history-max", historyMaxFromEnv(), "maximum number of releases kept in release history, with 0 meaning no limit")
-	kubeconfigFile       = flag.String("kubeconfig-file", "", "Location of kubecfg file for access to kubernetes master service")
+	kubeconfigFile       = flag.String("kubeconfig-file", "", "absolute path to the kubeconfig file")
 	// rootServer is the root gRPC server.
 	//
 	// Each gRPC service registers itself to this server during init().
@@ -108,8 +109,10 @@ func start() {
 	if (*kubeconfigFile == "") {
 		logger.Fatal("You didn't provide kubeconfig file string")
 	}
-	_clientcmdapiCfg := clientcmd.GetConfigFromFileOrDie(*kubeconfigFile)
-	config := clientcmd.NewDefaultClientConfig(*_clientcmdapiCfg, nil)
+
+	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
+	flags.Set("kubeconfig", *kubeconfigFile)
+	config := util.DefaultClientConfig(flags)
 	clientset, err := kube.New(config).ClientSet()
 	if err != nil {
 		logger.Fatalf("Cannot initialize Kubernetes connection: %s", err)
