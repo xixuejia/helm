@@ -105,7 +105,7 @@ func main() {
 
 func start() {
 
-	if (kubeconfigFile == nil) {
+	if (*kubeconfigFile == "") {
 		logger.Fatal("You didn't provide kubeconfig file string")
 	}
 	_clientcmdapiCfg := clientcmd.GetConfigFromFileOrDie(*kubeconfigFile)
